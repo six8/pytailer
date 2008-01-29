@@ -1,6 +1,5 @@
 # $Id$
 
-import os
 import re
 import time
 
@@ -22,9 +21,9 @@ class Tailer(object):
         return re.split('|'.join(self.line_terminators), data)
 
     def seek_end(self):
-        self.seek(0, os.SEEK_END)
+        self.seek(0, 2)
 
-    def seek(self, pos, whence=os.SEEK_SET):
+    def seek(self, pos, whence=0):
         self.file.seek(pos, whence)
 
     def read(self, read_size=None):
