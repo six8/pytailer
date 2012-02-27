@@ -1,0 +1,4 @@
+include README.rst
+include VERSION.txt
+include LICENSE
+recursive-include src/tailer *
