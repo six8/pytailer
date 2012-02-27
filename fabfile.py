@@ -20,7 +20,7 @@ def release():
     version = open('VERSION.txt').read().strip()
 
     print(green('Releasing %s...' % version))
-    local(clom.git.flow.release.start(version, a=True))
+    local(clom.git.flow.release.start(version))
     local(clom.git.flow.release.finish(version, m='Release %s' % version))
     local(clom.git.push('origin', 'master', tags=True))
     local(clom.python('setup.py', 'sdist', 'upload'))
