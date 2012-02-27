@@ -21,6 +21,8 @@ def release():
 
     print(green('Releasing %s...' % version))
     local(clom.git.flow.release.start(version))
-    local(clom.git.flow.release.finish(version, m='Release %s' % version))
+
+    # Can't use spaces in git flow release messages, see https://github.com/nvie/gitflow/issues/98
+    local(clom.git.flow.release.finish(version, m='Release-%s' % version))
     local(clom.git.push('origin', 'master', tags=True))
     local(clom.python('setup.py', 'sdist', 'upload'))
