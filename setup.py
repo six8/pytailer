@@ -3,14 +3,14 @@ from distutils.core import setup
 def main():
 
     setup(
-        name = 'tailer',
+        name = 'tailer3',
         packages=['tailer'],
         package_dir = {'':'src'},
         version = open('VERSION.txt').read().strip(),
-        author='Mike Thornton',
-        author_email='six8@devdetails.com',
-        url='http://github.com/six8/pytailer',
-        download_url='http://github.com/six8/pytailer',        
+        author='Daniel Narvaez',
+        author_email='dwnarvaez@gmail.com',
+        url='http://github.com/dnarvaez/pytailer',
+        download_url='http://github.com/dnarvaez/pytailer',        
         license='MIT',
         keywords=['tail', 'head'],
         description='Python tail is a simple implementation of GNU tail and head.',
