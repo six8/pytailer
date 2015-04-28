@@ -1,6 +1,7 @@
 import re
 import sys
 import time
+import os
 
 if sys.version_info < (3,):
     range = xrange
@@ -150,14 +151,20 @@ class Tailer(object):
         else:
             return []
 
-    def follow(self, delay=1.0):
+    def follow(self, delay=1.0, filename=None):
         """\
         Iterator generator that returns lines as data is added to the file.
 
         Based on: http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/157035
+
+        If filename is passed, will make sure that the file has not been deleted,
+        or that it has not been rotated. This feature is useful for compatability with
+        logrotate.
         """
         trailing = True       
-        
+        if filename is not None:
+            curino = os.fstat(self.file.fileno()).st_ino
+
         while 1:
             where = self.file.tell()
             line = self.file.readline()
@@ -177,9 +184,32 @@ class Tailer(object):
                 trailing = False
                 yield line
             else:
+                should_seek = True
+                if filename is not None:
+                    reopen = False
+                    try:
+                        if os.stat(filename).st_ino != curino:
+                            self.file.close()
+                            reopen = True
+                    except:
+                        # file probably has been deleted
+                        curino = None
+                        reopen = True
+
+                    if reopen:
+                        try:
+                            self.file = open(filename, "r")
+                            curino = os.fstat(self.file.fileno()).st_ino
+                            should_seek = False
+                        except:
+                            # a new file does not exist yet
+                            time.sleep(delay)        
+                
+                if should_seek:
+                    self.seek(where)
+                    time.sleep(delay)
+                
                 trailing = True
-                self.seek(where)
-                time.sleep(delay)
 
     def __iter__(self):
         return self.follow()
@@ -213,7 +243,7 @@ def head(file, lines=10):
     """
     return Tailer(file).head(lines)
 
-def follow(file, delay=1.0):
+def follow(file, delay=1.0, filename=None):
     """\
     Iterator generator that returns lines as data is added to the file.
 
@@ -233,7 +263,7 @@ def follow(file, delay=1.0):
     >>> fo.close()
     >>> os.remove('test_follow.txt')
     """
-    return Tailer(file, end=True).follow(delay)
+    return Tailer(file, end=True).follow(delay, filename)
 
 def _test():
     import doctest
