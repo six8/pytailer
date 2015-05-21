@@ -1,20 +1,21 @@
 from distutils.core import setup
 
+
 def main():
 
     setup(
-        name = 'tailer',
+        name='tailer',
         packages=['tailer'],
-        package_dir = {'':'src'},
-        version = open('VERSION.txt').read().strip(),
+        package_dir={'': 'src'},
+        version=open('VERSION.txt').read().strip(),
         author='Mike Thornton',
         author_email='six8@devdetails.com',
         url='http://github.com/six8/pytailer',
-        download_url='http://github.com/six8/pytailer',        
+        download_url='http://github.com/six8/pytailer',
         license='MIT',
         keywords=['tail', 'head'],
         description='Python tail is a simple implementation of GNU tail and head.',
-        classifiers = [
+        classifiers=[
             "Programming Language :: Python",
             "Development Status :: 3 - Alpha",
             "Environment :: Console",
@@ -30,11 +31,11 @@ def main():
             "Topic :: System :: Systems Administration",
         ],
         long_description=open('README.rst').read(),
-        entry_points = {
+        entry_points={
             'console_scripts': [
                 'pytail = tailer:main',
             ],
-        },        
+        },
     )
 
 if __name__ == '__main__':
