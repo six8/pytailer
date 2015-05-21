@@ -12,13 +12,19 @@ class Tailer(object):
     """
     line_terminators = ('\r\n', '\n', '\r')
 
-    def __init__(self, file, read_size=1024, end=False):
+    def __init__(self, file, read_size=1024, end=False, sleeper=None):
         self.read_size = read_size
         self.file = file
         self.start_pos = self.file.tell()
         if end:
             self.seek_end()
-    
+        if sleeper is not None:
+            self.sleeper = sleeper
+
+    @staticmethod
+    def sleeper(delay):
+        time.sleep(delay)
+
     def splitlines(self, data):
         return re.split('|'.join(self.line_terminators), data)
 
@@ -179,7 +185,7 @@ class Tailer(object):
             else:
                 trailing = True
                 self.seek(where)
-                time.sleep(delay)
+                self.sleeper(delay)
 
     def __iter__(self):
         return self.follow()
@@ -213,7 +219,7 @@ def head(file, lines=10):
     """
     return Tailer(file).head(lines)
 
-def follow(file, delay=1.0):
+def follow(file, delay=1.0, sleeper=None):
     """\
     Iterator generator that returns lines as data is added to the file.
 
@@ -229,11 +235,15 @@ def follow(file, delay=1.0):
     >>> f.flush()
     >>> generator.next()
     'Line 2'
+    >>> def sleeper(delay): f.write('Line 3\\n'); f.flush()
+    >>> generator = follow(fo, sleeper=sleeper)
+    >>> generator.next()
+    'Line 3'
     >>> f.close()
     >>> fo.close()
     >>> os.remove('test_follow.txt')
     """
-    return Tailer(file, end=True).follow(delay)
+    return Tailer(file, end=True, sleeper=sleeper).follow(delay)
 
 def _test():
     import doctest
