@@ -200,10 +200,13 @@ def tail(file, lines=10):
     """\
     Return the last lines of the file.
 
-    >>> import StringIO
-    >>> f = StringIO.StringIO()
+    >>> try:
+    ...     import StringIO as stringio
+    ... except ImportError:
+    ...    import io as stringio
+    >>> f = stringio.StringIO()
     >>> for i in range(11):
-    ...     f.write('Line %d\\n' % (i + 1))
+    ...     x = f.write('Line %d\\n' % (i + 1))
     >>> tail(f, 3)
     ['Line 9', 'Line 10', 'Line 11']
     """
@@ -214,10 +217,13 @@ def head(file, lines=10):
     """\
     Return the top lines of the file.
 
-    >>> import StringIO
-    >>> f = StringIO.StringIO()
+    >>> try:
+    ...     import StringIO as stringio
+    ... except ImportError:
+    ...    import io as stringio
+    >>> f = stringio.StringIO()
     >>> for i in range(11):
-    ...     f.write('Line %d\\n' % (i + 1))
+    ...     x = f.write('Line %d\\n' % (i + 1))
     >>> head(f, 3)
     ['Line 1', 'Line 2', 'Line 3']
     """
@@ -229,20 +235,22 @@ def follow(file, delay=1.0, sleeper=None):
     Iterator generator that returns lines as data is added to the file.
 
     >>> import os
-    >>> f = file('test_follow.txt', 'w')
-    >>> fo = file('test_follow.txt', 'r')
+    >>> f = open('test_follow.txt', 'w')
+    >>> fo = open('test_follow.txt', 'r')
     >>> generator = follow(fo)
-    >>> f.write('Line 1\\n')
+    >>> x = f.write('Line 1\\n')
     >>> f.flush()
-    >>> generator.next()
+    >>> next(generator)
     'Line 1'
-    >>> f.write('Line 2\\n')
+    >>> x = f.write('Line 2\\n')
     >>> f.flush()
-    >>> generator.next()
+    >>> next(generator)
     'Line 2'
-    >>> def sleeper(delay): f.write('Line 3\\n'); f.flush()
+    >>> def sleeper(delay):
+    ...     f.write('Line 3\\n')
+    ...     f.flush()
     >>> generator = follow(fo, sleeper=sleeper)
-    >>> generator.next()
+    >>> next(generator)
     'Line 3'
     >>> f.close()
     >>> fo.close()
