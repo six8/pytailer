@@ -5,20 +5,28 @@ import time
 if sys.version_info < (3,):
     range = xrange
 
+
 class Tailer(object):
+
     """\
     Implements tailing and heading functionality like GNU tail and head
     commands.
     """
     line_terminators = ('\r\n', '\n', '\r')
 
-    def __init__(self, file, read_size=1024, end=False):
+    def __init__(self, file, read_size=1024, end=False, sleeper=None):
         self.read_size = read_size
         self.file = file
         self.start_pos = self.file.tell()
         if end:
             self.seek_end()
-    
+        if sleeper is not None:
+            self.sleeper = sleeper
+
+    @staticmethod
+    def sleeper(delay):
+        time.sleep(delay)
+
     def splitlines(self, data):
         return re.split('|'.join(self.line_terminators), data)
 
@@ -50,7 +58,7 @@ class Tailer(object):
             # The first charachter is a line terminator, don't count this one
             start += 1
 
-        while bytes_read > 0:          
+        while bytes_read > 0:
             # Scan forwards, counting the newlines in this bufferfull
             i = start
             while i < bytes_read:
@@ -92,7 +100,7 @@ class Tailer(object):
                 # found crlf
                 bytes_read -= 1
 
-        while bytes_read > 0:          
+        while bytes_read > 0:
             # Scan backward, counting the newlines in this bufferfull
             i = bytes_read - 1
             while i >= 0:
@@ -112,7 +120,7 @@ class Tailer(object):
             bytes_read, read_str = self.read(self.read_size)
 
         return None
-  
+
     def tail(self, lines=10):
         """\
         Return the last lines of the file.
@@ -129,7 +137,7 @@ class Tailer(object):
             return self.splitlines(data)
         else:
             return []
-               
+
     def head(self, lines=10):
         """\
         Return the top lines of the file.
@@ -139,9 +147,9 @@ class Tailer(object):
         for i in range(lines):
             if not self.seek_line_forward():
                 break
-    
+
         end_pos = self.file.tell()
-        
+
         self.seek(0)
         data = self.file.read(end_pos - 1)
 
@@ -156,12 +164,12 @@ class Tailer(object):
 
         Based on: http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/157035
         """
-        trailing = True       
-        
+        trailing = True
+
         while 1:
             where = self.file.tell()
             line = self.file.readline()
-            if line:    
+            if line:
                 if trailing and line in self.line_terminators:
                     # This is just the line terminator added to the end of the file
                     # before a new line, ignore.
@@ -179,7 +187,7 @@ class Tailer(object):
             else:
                 trailing = True
                 self.seek(where)
-                time.sleep(delay)
+                self.sleeper(delay)
 
     def __iter__(self):
         return self.follow()
@@ -187,57 +195,74 @@ class Tailer(object):
     def close(self):
         self.file.close()
 
+
 def tail(file, lines=10):
     """\
     Return the last lines of the file.
 
-    >>> import StringIO
-    >>> f = StringIO.StringIO()
+    >>> try:
+    ...     import StringIO as stringio
+    ... except ImportError:
+    ...    import io as stringio
+    >>> f = stringio.StringIO()
     >>> for i in range(11):
-    ...     f.write('Line %d\\n' % (i + 1))
+    ...     x = f.write('Line %d\\n' % (i + 1))
     >>> tail(f, 3)
     ['Line 9', 'Line 10', 'Line 11']
     """
     return Tailer(file).tail(lines)
 
+
 def head(file, lines=10):
     """\
     Return the top lines of the file.
 
-    >>> import StringIO
-    >>> f = StringIO.StringIO()
+    >>> try:
+    ...     import StringIO as stringio
+    ... except ImportError:
+    ...    import io as stringio
+    >>> f = stringio.StringIO()
     >>> for i in range(11):
-    ...     f.write('Line %d\\n' % (i + 1))
+    ...     x = f.write('Line %d\\n' % (i + 1))
     >>> head(f, 3)
     ['Line 1', 'Line 2', 'Line 3']
     """
     return Tailer(file).head(lines)
 
-def follow(file, delay=1.0):
+
+def follow(file, delay=1.0, sleeper=None):
     """\
     Iterator generator that returns lines as data is added to the file.
 
     >>> import os
-    >>> f = file('test_follow.txt', 'w')
-    >>> fo = file('test_follow.txt', 'r')
+    >>> f = open('test_follow.txt', 'w')
+    >>> fo = open('test_follow.txt', 'r')
     >>> generator = follow(fo)
-    >>> f.write('Line 1\\n')
+    >>> x = f.write('Line 1\\n')
     >>> f.flush()
-    >>> generator.next()
+    >>> next(generator)
     'Line 1'
-    >>> f.write('Line 2\\n')
+    >>> x = f.write('Line 2\\n')
     >>> f.flush()
-    >>> generator.next()
+    >>> next(generator)
     'Line 2'
+    >>> def sleeper(delay):
+    ...     f.write('Line 3\\n')
+    ...     f.flush()
+    >>> generator = follow(fo, sleeper=sleeper)
+    >>> next(generator)
+    'Line 3'
     >>> f.close()
     >>> fo.close()
     >>> os.remove('test_follow.txt')
     """
-    return Tailer(file, end=True).follow(delay)
+    return Tailer(file, end=True, sleeper=sleeper).follow(delay)
+
 
 def _test():
     import doctest
     doctest.testmod()
+
 
 def _main(filepath, options):
     tailer = Tailer(open(filepath, 'rb'))
@@ -252,7 +277,7 @@ def _main(filepath, options):
                     lines = tailer.head(options.lines)
                 else:
                     lines = tailer.tail(options.lines)
-        
+
                 for line in lines:
                     print(line)
             elif options.follow:
@@ -267,6 +292,7 @@ def _main(filepath, options):
             pass
     finally:
         tailer.close()
+
 
 def main():
     from optparse import OptionParser
