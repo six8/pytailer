@@ -167,7 +167,7 @@ class Tailer(object):
         else:
             return []
 
-    def follow(self, delay=1.0):
+    def follow(self, delay=1.0, on_delay=None):
         """\
         Iterator generator that returns lines as data is added to the file.
 
@@ -198,6 +198,8 @@ class Tailer(object):
 
                 trailing = False
                 yield line
+            elif on_delay and on_delay():
+                break
             else:
                 trailing = True
                 self.seek(where)
@@ -238,7 +240,7 @@ def head(file, lines=10):
     return Tailer(file).head(lines)
 
 
-def follow(file, delay=1.0):
+def follow(file, delay=1.0, on_delay=None):
     """\
     Iterator generator that returns lines as data is added to the file.
 
@@ -265,7 +267,7 @@ def follow(file, delay=1.0):
     >>> fo.close()
     >>> os.remove('test_follow.txt')
     """
-    return Tailer(file, end=True).follow(delay)
+    return Tailer(file, end=True).follow(delay, on_delay)
 
 
 def _test():
