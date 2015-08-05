@@ -1,9 +1,18 @@
+# -*- coding: utf-8 -*-
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import re
 import sys
 import time
 
+
 if sys.version_info < (3,):
     range = xrange
+
 
 class Tailer(object):
     """\
@@ -187,47 +196,50 @@ class Tailer(object):
     def close(self):
         self.file.close()
 
+
 def tail(file, lines=10):
     """\
     Return the last lines of the file.
 
-    >>> import StringIO
-    >>> f = StringIO.StringIO()
+    >>> from io import StringIO
+    >>> f = StringIO()
     >>> for i in range(11):
-    ...     f.write('Line %d\\n' % (i + 1))
-    >>> tail(f, 3)
-    ['Line 9', 'Line 10', 'Line 11']
+    ...     _ = f.write('Line %d\\n' % (i + 1))
+    >>> tail(f, 3)  # doctest: +ELLIPSIS
+    [...'Line 9', ...'Line 10', ...'Line 11']
     """
     return Tailer(file).tail(lines)
+
 
 def head(file, lines=10):
     """\
     Return the top lines of the file.
 
-    >>> import StringIO
-    >>> f = StringIO.StringIO()
+    >>> from io import StringIO
+    >>> f = StringIO()
     >>> for i in range(11):
-    ...     f.write('Line %d\\n' % (i + 1))
-    >>> head(f, 3)
-    ['Line 1', 'Line 2', 'Line 3']
+    ...     _ = f.write('Line %d\\n' % (i + 1))
+    >>> head(f, 3)  # doctest: +ELLIPSIS
+    [...'Line 1', ...'Line 2', ...'Line 3']
     """
     return Tailer(file).head(lines)
+
 
 def follow(file, delay=1.0):
     """\
     Iterator generator that returns lines as data is added to the file.
 
     >>> import os
-    >>> f = file('test_follow.txt', 'w')
-    >>> fo = file('test_follow.txt', 'r')
+    >>> f = open('test_follow.txt', 'w')
+    >>> fo = open('test_follow.txt', 'r')
     >>> generator = follow(fo)
-    >>> f.write('Line 1\\n')
+    >>> _ = f.write('Line 1\\n')
     >>> f.flush()
-    >>> generator.next()
+    >>> next(generator)
     'Line 1'
-    >>> f.write('Line 2\\n')
+    >>> _ = f.write('Line 2\\n')
     >>> f.flush()
-    >>> generator.next()
+    >>> next(generator)
     'Line 2'
     >>> f.close()
     >>> fo.close()
@@ -235,9 +247,11 @@ def follow(file, delay=1.0):
     """
     return Tailer(file, end=True).follow(delay)
 
+
 def _test():
     import doctest
     doctest.testmod()
+
 
 def _main(filepath, options):
     tailer = Tailer(open(filepath, 'rb'))
@@ -267,6 +281,7 @@ def _main(filepath, options):
             pass
     finally:
         tailer.close()
+
 
 def main():
     from optparse import OptionParser
