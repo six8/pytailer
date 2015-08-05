@@ -24,7 +24,6 @@ class Tailer(object):
     def __init__(self, file, read_size=1024, end=False):
         self.read_size = read_size
         self.file = file
-        self.start_pos = self.file.tell()
         if end:
             self.seek_end()
     
@@ -57,7 +56,7 @@ class Tailer(object):
         Searches forward from the current file position for a line terminator
         and seeks to the charachter after it.
         """
-        pos = start_pos = self.file.tell()
+        pos = self.file.tell()
 
         bytes_read, read_str = self.read(self.read_size)
 
