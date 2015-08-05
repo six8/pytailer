@@ -43,7 +43,7 @@ class Tailer(object):
         self.seek_end()
         s = self.file.tell()
         self.seek(p)
-        return s
+        return s + 1
 
     def read(self, read_size=None):
         if read_size:
