@@ -5,6 +5,8 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import io
+import os
 import re
 import sys
 import time
@@ -31,9 +33,9 @@ class Tailer(object):
         return re.split('|'.join(self.line_terminators), data)
 
     def seek_end(self):
-        self.seek(0, 2)
+        self.seek(0, io.SEEK_END)
 
-    def seek(self, pos, whence=0):
+    def seek(self, pos, whence=io.SEEK_SET):
         self.file.seek(pos, whence)
 
     def get_size(self):
@@ -240,24 +242,25 @@ def follow(file, delay=1.0):
     """\
     Iterator generator that returns lines as data is added to the file.
 
+    >>> import io
     >>> import os
-    >>> f = open('test_follow.txt', 'w')
-    >>> fo = open('test_follow.txt', 'r')
+    >>> f = io.open('test_follow.txt', 'w+')
+    >>> fo = io.open('test_follow.txt', 'r')
     >>> generator = follow(fo)
     >>> _ = f.write('Line 1\\n')
     >>> f.flush()
-    >>> next(generator)
-    'Line 1'
+    >>> print(next(generator))
+    Line 1
     >>> _ = f.write('Line 2\\n')
     >>> f.flush()
-    >>> next(generator)
-    'Line 2'
+    >>> print(next(generator))
+    Line 2
     >>> _ = f.truncate(0)
     >>> _ = f.seek(0)
     >>> _ = f.write('Line 3\\n')
     >>> f.flush()
-    >>> next(generator)
-    'Line 3'
+    >>> print(next(generator))
+    Line 3
     >>> f.close()
     >>> fo.close()
     >>> os.remove('test_follow.txt')
