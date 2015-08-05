@@ -270,6 +270,98 @@ def follow(file, delay=1.0, on_delay=None):
     return Tailer(file, end=True).follow(delay, on_delay)
 
 
+def follow_path(file_path, buffering=-1, encoding=None, errors=None, newline=None, delay=1.0, on_delay=None):
+    """\
+    Similar to follow, but also looks up if inode of file is changed
+    e.g. if it was re-created.
+
+    >>> import io
+    >>> import os
+    >>> f = io.open('test_follow_path.txt', 'w+')
+    >>> generator = follow_path('test_follow_path.txt')
+    >>> _ = f.write('Line 1\\n')
+    >>> f.flush()
+    >>> print(next(generator))
+    Line 1
+    >>> _ = f.write('Line 2\\n')
+    >>> f.flush()
+    >>> print(next(generator))
+    Line 2
+    >>> _ = f.truncate(0)
+    >>> _ = f.seek(0)
+    >>> _ = f.write('Line 3\\n')
+    >>> f.flush()
+    >>> print(next(generator))
+    Line 3
+    >>> f.close()
+    >>> os.remove('test_follow_path.txt')
+    >>> f = io.open('test_follow_path.txt', 'w+')
+    >>> _ = f.write('Line 4\\n')
+    >>> f.flush()
+    >>> print(next(generator))
+    Line 4
+    >>> f.close()
+    >>> os.remove('test_follow_path.txt')
+    """
+    class FollowPathGenerator(object):
+        def __init__(self):
+            if os.path.isfile(file_path):
+                self.following_file = io.open(file_path, 'r', buffering, encoding, errors, newline)
+                self.follow_generator = Tailer(self.following_file, end=True).follow(delay, self.check_if_inode_changed)
+                self.follow_from_end_on_open = False
+            else:
+                self.following_file = None
+                self.follow_generator = None
+                self.follow_from_end_on_open = True
+
+            self.should_break = False
+
+        def check_if_inode_changed(self):
+            if not os.path.isfile(file_path) or os.stat(file_path).st_ino != os.fstat(self.following_file.fileno()).st_ino:
+                return True
+            elif on_delay and on_delay():
+                self.should_break = True
+                return True
+            else:
+                return False
+
+        def next(self):
+            if self.should_break:
+                raise StopIteration()
+
+            while True:
+                try:
+                    if self.follow_generator:
+                        return next(self.follow_generator)  # TODO: may raise StopIteration
+                    elif os.path.isfile(file_path):
+                        self.following_file = io.open(file_path, 'r', buffering, encoding, errors, newline)
+                        self.follow_generator = Tailer(self.following_file, end=self.follow_from_end_on_open).follow(delay, self.check_if_inode_changed)
+                        self.follow_from_end_on_open = False
+                        return next(self.follow_generator)  # TODO: may raise StopIteration
+                    elif on_delay and on_delay():
+                        # User does not want to wait anymore.
+                        self.should_break = True
+                        raise StopIteration()
+                    else:
+                        time.sleep(delay)
+                except StopIteration:
+                    if self.should_break:
+                        raise
+                    else:
+                        self.following_file.close()
+                        self.following_file = None
+                        self.follow_generator = None
+                        continue
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            return self.next()
+
+    return FollowPathGenerator()
+
+
 def _test():
     import doctest
     doctest.testmod()
