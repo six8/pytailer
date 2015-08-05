@@ -37,6 +37,13 @@ class Tailer(object):
     def seek(self, pos, whence=0):
         self.file.seek(pos, whence)
 
+    def get_size(self):
+        p = self.file.tell()
+        self.seek_end()
+        s = self.file.tell()
+        self.seek(p)
+        return s
+
     def read(self, read_size=None):
         if read_size:
             read_str = self.file.read(read_size)
@@ -167,8 +174,13 @@ class Tailer(object):
         """
         trailing = True       
         
-        while 1:
+        while True:
             where = self.file.tell()
+
+            if where >= self.get_size():
+                # File was truncated.
+                self.seek(0)
+
             line = self.file.readline()
             if line:    
                 if trailing and line in self.line_terminators:
@@ -241,6 +253,12 @@ def follow(file, delay=1.0):
     >>> f.flush()
     >>> next(generator)
     'Line 2'
+    >>> _ = f.truncate(0)
+    >>> _ = f.seek(0)
+    >>> _ = f.write('Line 3\\n')
+    >>> f.flush()
+    >>> next(generator)
+    'Line 3'
     >>> f.close()
     >>> fo.close()
     >>> os.remove('test_follow.txt')
