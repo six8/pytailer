@@ -473,7 +473,7 @@ def follow_path(file_path, buffering=-1, encoding=None, errors=None):
                         else:
                             line = next(self.follow_generator)
 
-                return line.decode(encoding, errors=errors) if line is not None else line
+                return line.decode(encoding, errors) if line is not None else line
 
         def __iter__(self):
             return self
