@@ -12,6 +12,11 @@ import re
 import sys
 import time
 
+from tailer.version import VERSION
+
+
+__version__ = VERSION
+
 
 if sys.version_info < (3,):
     range = xrange

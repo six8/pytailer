@@ -1,11 +1,19 @@
+import os
 from setuptools import setup
+
+
+with open(os.path.join(os.path.dirname(__file__), 'src', 'tailer', 'version.py')) as f:
+    VERSION = None
+    code = compile(f.read(), 'version.py', 'exec')
+    exec(code)
+    assert VERSION
 
 
 setup(
     name='tailer',
     packages=['tailer'],
     package_dir={'': 'src'},
-    version=open('VERSION.txt').read().strip(),
+    version=VERSION,
     author='Mike Thornton',
     author_email='six8@devdetails.com',
     url='http://github.com/six8/pytailer',
