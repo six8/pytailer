@@ -7,15 +7,12 @@ from __future__ import unicode_literals
 
 import io
 import locale
+import logging
 import os
 import re
 import sys
-import time
 
 from tailer.version import VERSION
-
-
-__version__ = VERSION
 
 
 if sys.version_info < (3,):
@@ -28,6 +25,12 @@ if sys.version_info < (2, 7):
     SEEK_END = 2
 else:
     from io import SEEK_SET, SEEK_CUR, SEEK_END
+
+
+__version__ = VERSION
+
+
+LOG = logging.getLogger('tailer')
 
 
 class Tailer(object):
@@ -246,24 +249,25 @@ class Tailer(object):
         else:
             return []
 
-    def follow(self, delay=1.0, on_delay=None):
+    def follow(self):
         """
         Iterator generator that returns lines as data is added to the file.
 
-        Based on: http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/157035
+        None will be yielded if no new line is available.
+        Caller may either wait and re-try or end iteration.
         """
         trailing = True       
         
         while True:
             where = self.file.tell()
 
-            size = os.fstat(self.file.fileno()).st_size
-            if where > size:
+            if where > os.fstat(self.file.fileno()).st_size:
                 # File was truncated.
                 where = 0
                 self.file.seek(where)
 
             line = self.file.readline()
+
             if line:    
                 if trailing and line in self.LINE_TERMINATORS:
                     # This is just the line terminator added to the end of the file
@@ -277,12 +281,10 @@ class Tailer(object):
 
                 trailing = False
                 yield line
-            elif on_delay and on_delay():
-                break
             else:
                 trailing = True
                 self.file.seek(where)
-                time.sleep(delay)
+                yield None
 
 
 def tail(file, lines=10, read_size=1024):
@@ -344,7 +346,7 @@ def head(file, lines=10, read_size=1024):
     return Tailer(file, read_size).head(lines)
 
 
-def follow(file, delay=1.0, on_delay=None):
+def follow(file):
     """
     Generator that returns lines as data is added to the file.
 
@@ -369,19 +371,22 @@ def follow(file, delay=1.0, on_delay=None):
     >>> f.flush()
     >>> print(next(generator).decode('utf-8'))
     Line 3
+    >>> print(next(generator))
+    None
     >>> f.close()
     >>> fo.close()
     >>> os.remove('test_follow.txt')
     """
-    return Tailer(file, end=True).follow(delay, on_delay)
+    return Tailer(file, end=True).follow()
 
 
-def follow_path(file_path, buffering=-1, encoding=None, errors=None, newline=None, delay=1.0, on_delay=None):
+def follow_path(file_path, buffering=-1, encoding=None, errors=None, newline=None):
     """
     Similar to follow, but also looks up if inode of file is changed
     e.g. if it was re-created.
 
     Returned generator yields strings encoded by using encoding.
+    If encoding is not specified, it defaults to locale.getpreferredencoding()
 
     >>> import io
     >>> import os
@@ -408,6 +413,8 @@ def follow_path(file_path, buffering=-1, encoding=None, errors=None, newline=Non
     >>> f.flush()
     >>> print(next(generator))
     Line 4
+    >>> print(next(generator))
+    None
     >>> f.close()
     >>> os.remove('test_follow_path.txt')
     """
@@ -418,51 +425,52 @@ def follow_path(file_path, buffering=-1, encoding=None, errors=None, newline=Non
         def __init__(self):
             if os.path.isfile(file_path):
                 self.following_file = io.open(file_path, 'rb', buffering, None, errors, newline)
-                self.follow_generator = Tailer(self.following_file, end=True).follow(delay, self.check_if_inode_changed)
+                self.follow_generator = Tailer(self.following_file, end=True).follow()
                 self.follow_from_end_on_open = False
             else:
                 self.following_file = None
                 self.follow_generator = None
                 self.follow_from_end_on_open = True
 
-            self.should_break = False
-
-        def check_if_inode_changed(self):
-            if not os.path.isfile(file_path) or os.stat(file_path).st_ino != os.fstat(self.following_file.fileno()).st_ino:
-                return True
-            elif on_delay and on_delay():
-                self.should_break = True
-                return True
-            else:
-                return False
-
         def next(self):
-            if self.should_break:
-                raise StopIteration()
-
             while True:
-                try:
+                if self.follow_generator:
+                    line = next(self.follow_generator)
+                else:
+                    line = None
+
+                if line is None:
                     if self.follow_generator:
-                        return next(self.follow_generator).decode(encoding)
-                    elif os.path.isfile(file_path):
-                        self.following_file = io.open(file_path, 'rb', buffering, None, errors, newline)
-                        self.follow_generator = Tailer(self.following_file, end=self.follow_from_end_on_open).follow(delay, self.check_if_inode_changed)
-                        self.follow_from_end_on_open = False
-                        return next(self.follow_generator).decode(encoding)
-                    elif on_delay and on_delay():
-                        # User does not want to wait anymore.
-                        self.should_break = True
-                        raise StopIteration()
-                    else:
-                        time.sleep(delay)
-                except StopIteration:
-                    if self.should_break:
-                        raise
-                    else:
-                        self.following_file.close()
-                        self.following_file = None
-                        self.follow_generator = None
-                        continue
+                        try:
+                            is_file_changed = not os.path.isfile(file_path) or os.stat(file_path).st_ino != os.fstat(self.following_file.fileno()).st_ino
+                        except OSError:
+                            # File could be deleted between isfile and stat invocations, which will make the latter to fail.
+                            is_file_changed = True
+
+                        if is_file_changed:
+                            # File was deleted or re-created.
+                            self.following_file.close()
+                            self.following_file = None
+                            self.follow_generator = None
+
+                    if not self.follow_generator and os.path.isfile(file_path):
+                        # New file is available. Open it.
+                        try:
+                            self.following_file = io.open(file_path, 'rb', buffering, None, errors, newline)
+                            self.follow_generator = Tailer(self.following_file, end=self.follow_from_end_on_open).follow()
+                            self.follow_from_end_on_open = False  # something could be written before we noticed change of file
+                        except (IOError, OSError) as e:
+                            LOG.info("Unable to tail file: %s", e)
+                            if self.following_file:
+                                self.following_file.close()
+
+                            self.following_file= None
+                            self.follow_generator = None
+                            line = None
+                        else:
+                            line = next(self.follow_generator)
+
+                return line.decode(encoding) if line is not None else line
 
         def __iter__(self):
             return self

@@ -7,6 +7,7 @@ from __future__ import unicode_literals
 
 import locale
 import sys
+import time
 
 from tailer import head, tail, follow_path
 
@@ -33,8 +34,11 @@ def _main(filepath, options):
                     print(line.decode(encoding))
 
         if options.follow:
-            for line in follow_path(filepath, delay=options.sleep):
-                print(line)
+            for line in follow_path(filepath):
+                if line is not None:
+                    print(line)
+                else:
+                    time.sleep(options.sleep)
     except KeyboardInterrupt:
         # Escape silently
         pass
