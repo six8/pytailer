@@ -179,7 +179,13 @@ class Tailer(object):
 
             offset += data_len
 
-        return -1
+        if where == 0:
+            # Nothing more to read.
+            return -1
+        else:
+            # Very first line.
+            self.file.seek(0)
+            return 0
   
     def tail(self, lines=10):
         """
@@ -287,9 +293,19 @@ def tail(file, lines=10, read_size=1024):
     ...         _ = fw.write('\\n')
     ...         _ = fw.write('\\r\\n')
     ...         _ = fw.write('\\r\\n')
-    ...         _ = fw.flush()
+    ...         fw.flush()
     ...         tail(fr, 6, 1)  # doctest: +ELLIPSIS
     [...'Line 2', ...'Line 3', ...'Line 4', ...'', ...'', ...'']
+    >>> os.remove('test_tail.txt')
+
+    >>> import io
+    >>>
+    ... with io.open('test_tail.txt', 'w+') as fw:
+    ...     with io.open('test_tail.txt', 'rb') as fr:
+    ...         _ = fw.write('Line 1')
+    ...         fw.flush()
+    ...         tail(fr, 6, 1)  # doctest: +ELLIPSIS
+    [...'Line 1']
     >>> os.remove('test_tail.txt')
     """
     return Tailer(file, read_size).tail(lines)
@@ -312,7 +328,7 @@ def head(file, lines=10, read_size=1024):
     ...         _ = fw.write('Line 4\\r\\n')
     ...         _ = fw.write('\\n')
     ...         _ = fw.write('\\r')
-    ...         _ = fw.flush()
+    ...         fw.flush()
     ...         head(fr, 6, 1)  # doctest: +ELLIPSIS
     [...'', ...'', ...'', ...'Line 1', ...'Line 2', ...'Line 3']
     """
