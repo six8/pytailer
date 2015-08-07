@@ -1,4 +1,4 @@
-from distutils.core import setup
+from setuptools import setup
 
 
 setup(
@@ -29,9 +29,8 @@ setup(
         "Topic :: System :: Systems Administration",
     ],
     long_description=open('README.rst').read(),
-    entry_points={
-        'console_scripts': [
-            'pytail = tailer:main',
-        ],
-    },
+    entry_points="""
+    [console_scripts]
+    pytail=tailer:main
+    """
 )
