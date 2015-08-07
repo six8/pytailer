@@ -421,6 +421,9 @@ def follow_path(file_path, buffering=-1, encoding=None, errors=None):
     if encoding is None:
         encoding = locale.getpreferredencoding()
 
+    if not errors:
+        errors = 'strict'
+
     class FollowPathGenerator(object):
         def __init__(self):
             if os.path.isfile(file_path):
