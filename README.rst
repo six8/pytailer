@@ -1,3 +1,5 @@
+.. image:: https://travis-ci.org/GreatFruitOmsk/pytailer.svg?branch=master
+
 ======
 Tailer
 ======
