@@ -39,6 +39,6 @@ setup(
     long_description=open('README.rst').read(),
     entry_points="""
     [console_scripts]
-    pytail=tailer:main
+    pytail=tailer.__main__:main
     """
 )
