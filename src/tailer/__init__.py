@@ -6,6 +6,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import io
+import locale
 import os
 import re
 import sys
@@ -17,150 +18,211 @@ if sys.version_info < (3,):
 
 
 class Tailer(object):
-    """\
+    """
     Implements tailing and heading functionality like GNU tail and head
     commands.
     """
-    line_terminators = ('\r\n', '\n', '\r')
+    LINE_TERMINATORS = (b'\r\n', b'\n', b'\r')
 
     def __init__(self, file, read_size=1024, end=False):
+        """
+        Tailer requires file to be opened in binary mode, otherwise
+        the behavior of tell suffers from implementation detail on Windows
+        where it may return negative numbers. Per modern Python documentation
+        tell returns opaque number for text objects that may not represent
+        number of bytes.
+
+        :param file: File-like object opened in binary mode.
+        :param read_size: How many bytes to read at once. Affects head and tail calls.
+        :param end: Whether to start reading from end.
+
+        :raise ValueError: If file is not open in binary mode.
+        """
+        if not isinstance(file, io.IOBase) or isinstance(file, io.TextIOBase):
+            raise ValueError("io object must be in the binary mode")
+
         self.read_size = read_size
         self.file = file
+
         if end:
-            self.seek_end()
-    
+            self.file.seek(0, io.SEEK_END)
+
     def splitlines(self, data):
-        return re.split('|'.join(self.line_terminators), data)
+        """
+        Split data into lines where lines are separated by LINE_TERMINATORS.
 
-    def seek_end(self):
-        self.seek(0, io.SEEK_END)
+        :param data: Any chunk of binary data.
+        :return: List of lines without any characters at LINE_TERMINATORS.
+        """
+        return re.split(b'|'.join(self.LINE_TERMINATORS), data)
 
-    def seek(self, pos, whence=io.SEEK_SET):
-        self.file.seek(pos, whence)
-
-    def get_size(self):
-        p = self.file.tell()
-        self.seek_end()
-        s = self.file.tell()
-        self.seek(p)
-        return s + 1
-
-    def read(self, read_size=None):
-        if read_size:
-            read_str = self.file.read(read_size)
-        else:
-            read_str = self.file.read()
-
+    def read(self, read_size=-1):
+        """
+        Read given number of bytes from file.
+        :param read_size: Number of bytes to read. -1 to read all.
+        :return: Number of bytes read and data that was read.
+        """
+        read_str = self.file.read(read_size)
         return len(read_str), read_str
 
-    def seek_line_forward(self):
-        """\
-        Searches forward from the current file position for a line terminator
-        and seeks to the charachter after it.
+    def prefix_line_terminator(self, data):
         """
-        pos = self.file.tell()
-
-        bytes_read, read_str = self.read(self.read_size)
-
-        start = 0
-        if bytes_read and read_str[0] in self.line_terminators:
-            # The first charachter is a line terminator, don't count this one
-            start += 1
-
-        while bytes_read > 0:          
-            # Scan forwards, counting the newlines in this bufferfull
-            i = start
-            while i < bytes_read:
-                if read_str[i] in self.line_terminators:
-                    self.seek(pos + i + 1)
-                    return self.file.tell()
-                i += 1
-
-            pos += self.read_size
-            self.seek(pos)
-
-            bytes_read, read_str = self.read(self.read_size)
+        Return line terminator data begins with or None.
+        """
+        for t in self.LINE_TERMINATORS:
+            if data.startswith(t):
+                return t
 
         return None
 
-    def seek_line(self):
-        """\
-        Searches backwards from the current file position for a line terminator
-        and seeks to the charachter after it.
+    def suffix_line_terminator(self, data):
         """
-        pos = end_pos = self.file.tell()
-
-        read_size = self.read_size
-        if pos > read_size:
-            pos -= read_size
-        else:
-            pos = 0
-            read_size = end_pos
-
-        self.seek(pos)
-
-        bytes_read, read_str = self.read(read_size)
-
-        if bytes_read and read_str[-1] in self.line_terminators:
-            # The last charachter is a line terminator, don't count this one
-            bytes_read -= 1
-
-            if read_str[-2:] == '\r\n' and '\r\n' in self.line_terminators:
-                # found crlf
-                bytes_read -= 1
-
-        while bytes_read > 0:          
-            # Scan backward, counting the newlines in this bufferfull
-            i = bytes_read - 1
-            while i >= 0:
-                if read_str[i] in self.line_terminators:
-                    self.seek(pos + i + 1)
-                    return self.file.tell()
-                i -= 1
-
-            if pos == 0 or pos - self.read_size < 0:
-                # Not enought lines in the buffer, send the whole file
-                self.seek(0)
-                return None
-
-            pos -= self.read_size
-            self.seek(pos)
-
-            bytes_read, read_str = self.read(self.read_size)
+        Return line terminator data ends with or None.
+        """
+        for t in self.LINE_TERMINATORS:
+            if data.endswith(t):
+                return t
 
         return None
-  
-    def tail(self, lines=10):
-        """\
-        Return the last lines of the file.
-        """
-        self.seek_end()
-        end_pos = self.file.tell()
 
-        for i in range(lines):
-            if not self.seek_line():
+    def seek_next_line(self):
+        """
+        Seek next line relative to the current file position.
+
+        :return: Position of the line or -1 if next line was not found.
+        """
+        where = self.file.tell()
+        offset = 0
+
+        while True:
+            data_len, data = self.read(self.read_size)
+            data_where = 0
+
+            if not data_len:
                 break
 
-        data = self.file.read(end_pos - self.file.tell() - 1)
+            # Consider the following example: Foo\r | \nBar where " | " denotes current position,
+            # 'Foo\r' is the read part and '\nBar' is the remaining part.
+            # We should completely consume terminator "\r\n" by reading one extra byte.
+            if b'\r\n' in self.LINE_TERMINATORS and data[-1] == b'\r'[0]:
+                terminator_where = self.file.tell()
+                terminator_len, terminator_data = self.read(1)
+
+                if terminator_len and terminator_data[0] == b'\n'[0]:
+                    data_len += 1
+                    data += b'\n'
+                else:
+                    self.file.seek(terminator_where)
+
+            while data_where < data_len:
+                terminator = self.prefix_line_terminator(data[data_where:])
+                if terminator:
+                    self.file.seek(where + offset + data_where + len(terminator))
+                    return self.file.tell()
+                else:
+                    data_where += 1
+
+            offset += data_len
+            self.file.seek(where + offset)
+
+        return -1
+
+    def seek_previous_line(self):
+        """
+        Seek previous line relative to the current file position.
+
+        :return: Position of the line or -1 if previous line was not found.
+        """
+        where = self.file.tell()
+        offset = 0
+        line_terminated = False
+
+        while True:
+            if offset == where:
+                break
+
+            read_size = self.read_size if self.read_size <= where else where
+            self.file.seek(where - offset - read_size, io.SEEK_SET)
+            data_len, data = self.read(read_size)
+
+            # Consider the following example: Foo\r | \nBar where " | " denotes current position,
+            # '\nBar' is the read part and 'Foo\r' is the remaining part.
+            # We should completely consume terminator "\r\n" by reading one extra byte.
+            if b'\r\n' in self.LINE_TERMINATORS and data[0] == b'\n'[0]:
+                terminator_where = self.file.tell()
+                if terminator_where > data_len + 1:
+                    self.file.seek(where - offset - data_len - 1, io.SEEK_SET)
+                    terminator_len, terminator_data = self.read(1)
+
+                    if terminator_data[0] == b'\r'[0]:
+                        data_len += 1
+                        data = b'\r' + data
+
+                    self.file.seek(terminator_where)
+
+            data_where = data_len
+
+            while data_where > 0:
+                terminator = self.suffix_line_terminator(data[:data_where])
+                if terminator and offset == 0 and data_where == data_len:
+                    # The last character is a line terminator that finishes current line. Ignore it.
+                    data_where -= len(terminator)
+                    line_terminated = True
+                elif terminator:
+                    self.file.seek(where - offset - (data_len - data_where))
+                    return self.file.tell()
+                else:
+                    data_where -= 1
+
+            offset += data_len
+
+        return -1
+  
+    def tail(self, lines=10):
+        """
+        Return the last lines of the file.
+        """
+        self.file.seek(0, io.SEEK_END)
+
+        for i in range(lines):
+            if self.seek_previous_line() == -1:
+                break
+
+        data = self.file.read()
+
+        for t in self.LINE_TERMINATORS:
+            if data.endswith(t):
+                # Only terminators _between_ lines should be preserved.
+                # Otherwise terminator of the last line will be treated as separtaing line and empty line.
+                data = data[:-len(t)]
+                break
+
         if data:
             return self.splitlines(data)
         else:
             return []
                
     def head(self, lines=10):
-        """\
+        """
         Return the top lines of the file.
         """
-        self.seek(0)
+        self.file.seek(0)
 
         for i in range(lines):
-            if not self.seek_line_forward():
+            if self.seek_next_line() == -1:
                 break
     
         end_pos = self.file.tell()
         
-        self.seek(0)
-        data = self.file.read(end_pos - 1)
+        self.file.seek(0)
+        data = self.file.read(end_pos)
+
+        for t in self.LINE_TERMINATORS:
+            if data.endswith(t):
+                # Only terminators _between_ lines should be preserved.
+                # Otherwise terminator of the last line will be treated as separtaing line and empty line.
+                data = data[:-len(t)]
+                break
 
         if data:
             return self.splitlines(data)
@@ -168,7 +230,7 @@ class Tailer(object):
             return []
 
     def follow(self, delay=1.0, on_delay=None):
-        """\
+        """
         Iterator generator that returns lines as data is added to the file.
 
         Based on: http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/157035
@@ -178,23 +240,23 @@ class Tailer(object):
         while True:
             where = self.file.tell()
 
-            if where >= self.get_size():
+            size = os.fstat(self.file.fileno()).st_size
+            if where > size:
                 # File was truncated.
-                self.seek(0)
+                where = 0
+                self.file.seek(where)
 
             line = self.file.readline()
             if line:    
-                if trailing and line in self.line_terminators:
+                if trailing and line in self.LINE_TERMINATORS:
                     # This is just the line terminator added to the end of the file
                     # before a new line, ignore.
                     trailing = False
                     continue
 
-                if line[-1] in self.line_terminators:
-                    line = line[:-1]
-                    if line[-1:] == '\r\n' and '\r\n' in self.line_terminators:
-                        # found crlf
-                        line = line[:-1]
+                terminator = self.suffix_line_terminator(line)
+                if terminator:
+                    line = line[:-len(terminator)]
 
                 trailing = False
                 yield line
@@ -202,66 +264,82 @@ class Tailer(object):
                 break
             else:
                 trailing = True
-                self.seek(where)
+                self.file.seek(where)
                 time.sleep(delay)
 
-    def __iter__(self):
-        return self.follow()
 
-    def close(self):
-        self.file.close()
-
-
-def tail(file, lines=10):
-    """\
+def tail(file, lines=10, read_size=1024):
+    """
     Return the last lines of the file.
 
-    >>> from io import StringIO
-    >>> f = StringIO()
-    >>> for i in range(11):
-    ...     _ = f.write('Line %d\\n' % (i + 1))
-    >>> tail(f, 3)  # doctest: +ELLIPSIS
-    [...'Line 9', ...'Line 10', ...'Line 11']
+    >>> import io
+    >>>
+    ... with io.open('test_tail.txt', 'w+') as fw:
+    ...     with io.open('test_tail.txt', 'rb') as fr:
+    ...         _ = fw.write('\\r')
+    ...         _ = fw.write('Line 1\\r\\n')
+    ...         _ = fw.write('Line 2\\n')
+    ...         _ = fw.write('Line 3\\r')
+    ...         _ = fw.write('Line 4\\r\\n')
+    ...         _ = fw.write('\\n')
+    ...         _ = fw.write('\\r\\n')
+    ...         _ = fw.write('\\r\\n')
+    ...         _ = fw.flush()
+    ...         tail(fr, 6, 1)  # doctest: +ELLIPSIS
+    [...'Line 2', ...'Line 3', ...'Line 4', ...'', ...'', ...'']
+    >>> os.remove('test_tail.txt')
     """
-    return Tailer(file).tail(lines)
+    return Tailer(file, read_size).tail(lines)
 
 
-def head(file, lines=10):
-    """\
+def head(file, lines=10, read_size=1024):
+    """
     Return the top lines of the file.
 
-    >>> from io import StringIO
-    >>> f = StringIO()
-    >>> for i in range(11):
-    ...     _ = f.write('Line %d\\n' % (i + 1))
-    >>> head(f, 3)  # doctest: +ELLIPSIS
-    [...'Line 1', ...'Line 2', ...'Line 3']
+    >>> import io
+    >>>
+    ... with io.open('test_head.txt', 'w+') as fw:
+    ...     with io.open('test_head.txt', 'rb') as fr:
+    ...         _ = fw.write('\\r\\n')
+    ...         _ = fw.write('\\r\\n')
+    ...         _ = fw.write('\\r')
+    ...         _ = fw.write('Line 1\\r\\n')
+    ...         _ = fw.write('Line 2\\r\\n')
+    ...         _ = fw.write('Line 3\\r')
+    ...         _ = fw.write('Line 4\\r\\n')
+    ...         _ = fw.write('\\n')
+    ...         _ = fw.write('\\r')
+    ...         _ = fw.flush()
+    ...         head(fr, 6, 1)  # doctest: +ELLIPSIS
+    [...'', ...'', ...'', ...'Line 1', ...'Line 2', ...'Line 3']
     """
-    return Tailer(file).head(lines)
+    return Tailer(file, read_size).head(lines)
 
 
 def follow(file, delay=1.0, on_delay=None):
-    """\
-    Iterator generator that returns lines as data is added to the file.
+    """
+    Generator that returns lines as data is added to the file.
+
+    Returned generator yields bytes.
 
     >>> import io
     >>> import os
     >>> f = io.open('test_follow.txt', 'w+')
-    >>> fo = io.open('test_follow.txt', 'r')
+    >>> fo = io.open('test_follow.txt', 'rb')
     >>> generator = follow(fo)
     >>> _ = f.write('Line 1\\n')
     >>> f.flush()
-    >>> print(next(generator))
+    >>> print(next(generator).decode('utf-8'))
     Line 1
     >>> _ = f.write('Line 2\\n')
     >>> f.flush()
-    >>> print(next(generator))
+    >>> print(next(generator).decode('utf-8'))
     Line 2
     >>> _ = f.truncate(0)
     >>> _ = f.seek(0)
     >>> _ = f.write('Line 3\\n')
     >>> f.flush()
-    >>> print(next(generator))
+    >>> print(next(generator).decode('utf-8'))
     Line 3
     >>> f.close()
     >>> fo.close()
@@ -271,9 +349,11 @@ def follow(file, delay=1.0, on_delay=None):
 
 
 def follow_path(file_path, buffering=-1, encoding=None, errors=None, newline=None, delay=1.0, on_delay=None):
-    """\
+    """
     Similar to follow, but also looks up if inode of file is changed
     e.g. if it was re-created.
+
+    Returned generator yields strings encoded by using encoding.
 
     >>> import io
     >>> import os
@@ -303,10 +383,13 @@ def follow_path(file_path, buffering=-1, encoding=None, errors=None, newline=Non
     >>> f.close()
     >>> os.remove('test_follow_path.txt')
     """
+    if encoding is None:
+        encoding = locale.getpreferredencoding()
+
     class FollowPathGenerator(object):
         def __init__(self):
             if os.path.isfile(file_path):
-                self.following_file = io.open(file_path, 'r', buffering, encoding, errors, newline)
+                self.following_file = io.open(file_path, 'rb', buffering, None, errors, newline)
                 self.follow_generator = Tailer(self.following_file, end=True).follow(delay, self.check_if_inode_changed)
                 self.follow_from_end_on_open = False
             else:
@@ -332,12 +415,12 @@ def follow_path(file_path, buffering=-1, encoding=None, errors=None, newline=Non
             while True:
                 try:
                     if self.follow_generator:
-                        return next(self.follow_generator)  # TODO: may raise StopIteration
+                        return next(self.follow_generator).decode(encoding)
                     elif os.path.isfile(file_path):
-                        self.following_file = io.open(file_path, 'r', buffering, encoding, errors, newline)
+                        self.following_file = io.open(file_path, 'rb', buffering, None, errors, newline)
                         self.follow_generator = Tailer(self.following_file, end=self.follow_from_end_on_open).follow(delay, self.check_if_inode_changed)
                         self.follow_from_end_on_open = False
-                        return next(self.follow_generator)  # TODO: may raise StopIteration
+                        return next(self.follow_generator).decode(encoding)
                     elif on_delay and on_delay():
                         # User does not want to wait anymore.
                         self.should_break = True
@@ -368,64 +451,63 @@ def _test():
 
 
 def _main(filepath, options):
-    tailer = Tailer(open(filepath, 'rb'))
-
     try:
-        try:
-            if options.lines > 0:
+        if options.lines > 0:
+            with open(filepath, 'rb') as f:
                 if options.head:
                     if options.follow:
                         sys.stderr.write('Cannot follow from top of file.\n')
                         sys.exit(1)
-                    lines = tailer.head(options.lines)
+                    lines = head(f, options.lines)
                 else:
-                    lines = tailer.tail(options.lines)
-        
-                for line in lines:
-                    print(line)
-            elif options.follow:
-                # Seek to the end so we can follow
-                tailer.seek_end()
+                    lines = tail(f, options.lines)
 
-            if options.follow:
-                for line in tailer.follow(delay=options.sleep):
-                    print(line)
-        except KeyboardInterrupt:
-            # Escape silently
-            pass
-    finally:
-        tailer.close()
+                for line in lines:
+                    print(line.decode(locale.getpreferredencoding()))
+
+        if options.follow:
+            for line in follow_path(filepath, delay=options.sleep):
+                print(line)
+    except KeyboardInterrupt:
+        # Escape silently
+        pass
 
 
 def main():
-    from optparse import OptionParser
+    from argparse import ArgumentParser
     import sys
 
-    parser = OptionParser(usage='usage: %prog [options] filename')
-    parser.add_option('-f', '--follow', dest='follow', default=False, action='store_true',
-                      help='output appended data as  the  file  grows')
+    parser = ArgumentParser(prog='pytail')
 
-    parser.add_option('-n', '--lines', dest='lines', default=10, type='int',
-                      help='output the last N lines, instead of the last 10')
+    # group = parser.add_mutually_exclusive_group()
 
-    parser.add_option('-t', '--top', dest='head', default=False, action='store_true',
-                      help='output lines from the top instead of the bottom. Does not work with follow')
+    test_group = parser.add_argument_group("Test")
+    test_group.add_argument('--test', dest='test', default=False, action='store_true',
+                            help='run some basic tests')
 
-    parser.add_option('-s', '--sleep-interval', dest='sleep', default=1.0, metavar='S', type='float',
-                      help='with  -f,  sleep  for  approximately  S  seconds between iterations')
+    parser.add_argument('-n', '--lines', dest='lines', default=10, type=int,
+                        help='output the last N lines, instead of the last 10')
+    parser.add_argument('file', nargs='?', metavar='FILE', help="path to file")
 
-    parser.add_option('', '--test', dest='test', default=False, action='store_true',
-                      help='Run some basic tests')
+    head_group = parser.add_argument_group('Head')
+    head_group.add_argument('-t', '--top', dest='head', default=False, action='store_true',
+                            help='output lines from the top instead of the bottom; does not work with follow')
 
-    (options, args) = parser.parse_args()
+    tail_group = parser.add_argument_group('Tail')
+    tail_group.add_argument('-f', '--follow', dest='follow', default=False, action='store_true',
+                            help='output appended data as  the  file  grows')
+    tail_group.add_argument('-s', '--sleep-interval', metavar='DELAY', dest='sleep', default=1.0, type=float,
+                            help='with -f, sleep for approximately DELAY seconds between iterations')
 
-    if options.test:
+    args = parser.parse_args()
+
+    if args.test:
         _test()
-    elif not len(args) == 1:
+    elif args.file:
+        _main(args.file, args)
+    else:
         parser.print_help()
         sys.exit(1)
-    else:
-        _main(args[0], options)
 
 if __name__ == '__main__':
     main()
