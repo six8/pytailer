@@ -22,6 +22,14 @@ if sys.version_info < (3,):
     range = xrange
 
 
+if sys.version_info < (2, 7):
+    SEEK_SET = 0
+    SEEK_CUR = 1
+    SEEK_END = 2
+else:
+    from io import SEEK_SET, SEEK_CUR, SEEK_END
+
+
 class Tailer(object):
     """
     Implements tailing and heading functionality like GNU tail and head
@@ -50,7 +58,7 @@ class Tailer(object):
         self.file = file
 
         if end:
-            self.file.seek(0, io.SEEK_END)
+            self.file.seek(0, SEEK_END)
 
     def splitlines(self, data):
         """
@@ -146,7 +154,7 @@ class Tailer(object):
                 break
 
             read_size = self.read_size if self.read_size <= where else where
-            self.file.seek(where - offset - read_size, io.SEEK_SET)
+            self.file.seek(where - offset - read_size, SEEK_SET)
             data_len, data = self.read(read_size)
 
             # Consider the following example: Foo\r | \nBar where " | " denotes current position,
@@ -155,7 +163,7 @@ class Tailer(object):
             if b'\r\n' in self.LINE_TERMINATORS and data[0] == b'\n'[0]:
                 terminator_where = self.file.tell()
                 if terminator_where > data_len + 1:
-                    self.file.seek(where - offset - data_len - 1, io.SEEK_SET)
+                    self.file.seek(where - offset - data_len - 1, SEEK_SET)
                     terminator_len, terminator_data = self.read(1)
 
                     if terminator_data[0] == b'\r'[0]:
@@ -191,7 +199,7 @@ class Tailer(object):
         """
         Return the last lines of the file.
         """
-        self.file.seek(0, io.SEEK_END)
+        self.file.seek(0, SEEK_END)
 
         for i in range(lines):
             if self.seek_previous_line() == -1:
