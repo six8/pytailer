@@ -380,7 +380,7 @@ def follow(file):
     return Tailer(file, end=True).follow()
 
 
-def follow_path(file_path, buffering=-1, encoding=None, errors=None, newline=None):
+def follow_path(file_path, buffering=-1, encoding=None, errors=None):
     """
     Similar to follow, but also looks up if inode of file is changed
     e.g. if it was re-created.
@@ -424,7 +424,7 @@ def follow_path(file_path, buffering=-1, encoding=None, errors=None, newline=Non
     class FollowPathGenerator(object):
         def __init__(self):
             if os.path.isfile(file_path):
-                self.following_file = io.open(file_path, 'rb', buffering, None, errors, newline)
+                self.following_file = io.open(file_path, 'rb', buffering)
                 self.follow_generator = Tailer(self.following_file, end=True).follow()
                 self.follow_from_end_on_open = False
             else:
@@ -456,7 +456,7 @@ def follow_path(file_path, buffering=-1, encoding=None, errors=None, newline=Non
                     if not self.follow_generator and os.path.isfile(file_path):
                         # New file is available. Open it.
                         try:
-                            self.following_file = io.open(file_path, 'rb', buffering, None, errors, newline)
+                            self.following_file = io.open(file_path, 'rb', buffering)
                             self.follow_generator = Tailer(self.following_file, end=self.follow_from_end_on_open).follow()
                             self.follow_from_end_on_open = False  # something could be written before we noticed change of file
                         except (IOError, OSError) as e:
@@ -470,7 +470,7 @@ def follow_path(file_path, buffering=-1, encoding=None, errors=None, newline=Non
                         else:
                             line = next(self.follow_generator)
 
-                return line.decode(encoding) if line is not None else line
+                return line.decode(encoding, errors=errors) if line is not None else line
 
         def __iter__(self):
             return self
