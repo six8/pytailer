@@ -28,8 +28,9 @@ def _main(filepath, options):
                 else:
                     lines = tail(f, options.lines)
 
+                encoding = locale.getpreferredencoding()
                 for line in lines:
-                    print(line.decode(locale.getpreferredencoding()))
+                    print(line.decode(encoding))
 
         if options.follow:
             for line in follow_path(filepath, delay=options.sleep):
