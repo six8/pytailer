@@ -66,8 +66,8 @@ Tailer currently only has doctests.
 
 Run tests with nose::
 
-    nosetests --with-doctest src/tailer    
+    nosetests --with-doctest tailer
 
 Run tests with doctest::
 
-    python -m doctest -v src/tailer/__init__.py
+    python -m doctest -v tailer/__init__.py

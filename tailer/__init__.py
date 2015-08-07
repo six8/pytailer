@@ -140,7 +140,6 @@ class Tailer(object):
         """
         where = self.file.tell()
         offset = 0
-        line_terminated = False
 
         while True:
             if offset == where:
@@ -172,7 +171,6 @@ class Tailer(object):
                 if terminator and offset == 0 and data_where == data_len:
                     # The last character is a line terminator that finishes current line. Ignore it.
                     data_where -= len(terminator)
-                    line_terminated = True
                 elif terminator:
                     self.file.seek(where - offset - (data_len - data_where))
                     return self.file.tell()
