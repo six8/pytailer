@@ -339,6 +339,7 @@ def head(file, lines=10, read_size=1024):
     ...         fw.flush()
     ...         head(fr, 6, 1)  # doctest: +ELLIPSIS
     [...'', ...'', ...'', ...'Line 1', ...'Line 2', ...'Line 3']
+    >>> os.remove('test_head.txt')
     """
     return Tailer(file, read_size).head(lines)
 
