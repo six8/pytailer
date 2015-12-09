@@ -18,7 +18,7 @@ class Tailer(object):
         self.start_pos = self.file.tell()
         if end:
             self.seek_end()
-    
+
     def splitlines(self, data):
         return re.split('|'.join(self.line_terminators), data)
 
@@ -50,7 +50,7 @@ class Tailer(object):
             # The first charachter is a line terminator, don't count this one
             start += 1
 
-        while bytes_read > 0:          
+        while bytes_read > 0:
             # Scan forwards, counting the newlines in this bufferfull
             i = start
             while i < bytes_read:
@@ -92,7 +92,7 @@ class Tailer(object):
                 # found crlf
                 bytes_read -= 1
 
-        while bytes_read > 0:          
+        while bytes_read > 0:
             # Scan backward, counting the newlines in this bufferfull
             i = bytes_read - 1
             while i >= 0:
@@ -112,7 +112,7 @@ class Tailer(object):
             bytes_read, read_str = self.read(self.read_size)
 
         return None
-  
+
     def tail(self, lines=10):
         """\
         Return the last lines of the file.
@@ -129,7 +129,7 @@ class Tailer(object):
             return self.splitlines(data)
         else:
             return []
-               
+
     def head(self, lines=10):
         """\
         Return the top lines of the file.
@@ -139,9 +139,9 @@ class Tailer(object):
         for i in range(lines):
             if not self.seek_line_forward():
                 break
-    
+
         end_pos = self.file.tell()
-        
+
         self.seek(0)
         data = self.file.read(end_pos - 1)
 
@@ -156,12 +156,12 @@ class Tailer(object):
 
         Based on: http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/157035
         """
-        trailing = True       
-        
+        trailing = True
+
         while 1:
             where = self.file.tell()
             line = self.file.readline()
-            if line:    
+            if line:
                 if trailing and line in self.line_terminators:
                     # This is just the line terminator added to the end of the file
                     # before a new line, ignore.
@@ -191,10 +191,13 @@ def tail(file, lines=10):
     """\
     Return the last lines of the file.
 
-    >>> import StringIO
-    >>> f = StringIO.StringIO()
+    >>> try:
+    ...    from StringIO import StringIO
+    ... except ImportError:
+    ...    from io import StringIO
+    >>> f = StringIO()
     >>> for i in range(11):
-    ...     f.write('Line %d\\n' % (i + 1))
+    ...     _ = f.write('Line %d\\n' % (i + 1))
     >>> tail(f, 3)
     ['Line 9', 'Line 10', 'Line 11']
     """
@@ -204,10 +207,13 @@ def head(file, lines=10):
     """\
     Return the top lines of the file.
 
-    >>> import StringIO
-    >>> f = StringIO.StringIO()
+    >>> try:
+    ...    from StringIO import StringIO
+    ... except ImportError:
+    ...    from io import StringIO
+    >>> f = StringIO()
     >>> for i in range(11):
-    ...     f.write('Line %d\\n' % (i + 1))
+    ...     _ = f.write('Line %d\\n' % (i + 1))
     >>> head(f, 3)
     ['Line 1', 'Line 2', 'Line 3']
     """
@@ -218,16 +224,16 @@ def follow(file, delay=1.0):
     Iterator generator that returns lines as data is added to the file.
 
     >>> import os
-    >>> f = file('test_follow.txt', 'w')
-    >>> fo = file('test_follow.txt', 'r')
+    >>> f = open('test_follow.txt', 'w')
+    >>> fo = open('test_follow.txt', 'r')
     >>> generator = follow(fo)
-    >>> f.write('Line 1\\n')
+    >>> _ = f.write('Line 1\\n')
     >>> f.flush()
-    >>> generator.next()
+    >>> next(generator)
     'Line 1'
-    >>> f.write('Line 2\\n')
+    >>> _ = f.write('Line 2\\n')
     >>> f.flush()
-    >>> generator.next()
+    >>> next(generator)
     'Line 2'
     >>> f.close()
     >>> fo.close()
@@ -252,7 +258,7 @@ def _main(filepath, options):
                     lines = tailer.head(options.lines)
                 else:
                     lines = tailer.tail(options.lines)
-        
+
                 for line in lines:
                     print(line)
             elif options.follow:

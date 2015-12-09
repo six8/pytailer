@@ -2,7 +2,11 @@
 Tailer
 ======
 
-Python tail is a simple implementation of GNU tail and head. 
+.. image:: https://travis-ci.org/six8/pytailer.svg
+    :target: https://travis-ci.org/six8/pytailer
+    :alt: Build Status
+
+Python tail is a simple implementation of GNU tail and head.
 
 It provides 3 main functions that can be performed on any file-like object that supports ``seek()`` and ``tell()``.
 
@@ -34,7 +38,7 @@ Examples
   for i in range(11):
       f.write('Line %d\\n' % (i + 1))
   f.close()
-    
+
 Tail
 ----
 ::
@@ -66,7 +70,7 @@ Tailer currently only has doctests.
 
 Run tests with nose::
 
-    nosetests --with-doctest src/tailer    
+    nosetests --with-doctest src/tailer
 
 Run tests with doctest::
 
