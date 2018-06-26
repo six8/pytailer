@@ -1,6 +1,7 @@
 import re
 import sys
 import time
+import os.path
 
 if sys.version_info < (3,):
     range = xrange
