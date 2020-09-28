@@ -61,7 +61,8 @@ Follow
 
     # Follow the file as it grows
     for line in tailer.follow(open('test.txt')):
-        print line
+        print line # use print(line) for python3
+    
 
 Running Tests
 =============
