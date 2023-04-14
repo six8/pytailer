@@ -1,6 +1,7 @@
 import re
 import sys
 import time
+import os.path
 
 if sys.version_info < (3,):
     range = xrange
@@ -162,6 +163,8 @@ class Tailer(object):
         trailing = True
 
         while 1:
+            if not os.path.exists(os.path.realpath(self.file.name)): #Check if the file still exists
+                raise IOError
             where = self.file.tell()
             line = self.file.readline()
             if line:
