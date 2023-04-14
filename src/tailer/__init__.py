@@ -1,6 +1,7 @@
 import re
 import sys
 import time
+import os
 
 if sys.version_info < (3,):
     range = xrange
@@ -15,6 +16,7 @@ class Tailer(object):
     def __init__(self, file, read_size=1024, end=False):
         self.read_size = read_size
         self.file = file
+        self.cur_file_ino = os.fstat(self.file.fileno()).st_ino
         self.start_pos = self.file.tell()
         if end:
             self.seek_end()
@@ -153,6 +155,14 @@ class Tailer(object):
         else:
             return []
 
+    def _check_rotate(self):
+        if os.stat(self.file.name).st_ino != self.cur_file_ino:
+            new = open(self.file.name, "r")
+            self.file.close()
+            self.file = new
+            self.file.seek(0, 2)
+            self.cur_file_ino = os.fstat(self.file.fileno()).st_ino
+
     def follow(self, delay=1.0):
         """\
         Iterator generator that returns lines as data is added to the file.
@@ -183,6 +193,7 @@ class Tailer(object):
                 trailing = True
                 self.seek(where)
                 time.sleep(delay)
+                self._check_rotate()
 
     def __iter__(self):
         return self.follow()
