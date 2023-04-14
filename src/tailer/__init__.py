@@ -28,6 +28,9 @@ class Tailer(object):
     def seek(self, pos, whence=0):
         self.file.seek(pos, whence)
 
+    def tell(self):
+        return self.file.tell()
+
     def read(self, read_size=None):
         if read_size:
             read_str = self.file.read(read_size)
