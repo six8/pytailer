@@ -2,15 +2,14 @@ import re
 import sys
 import time
 
-if sys.version_info < (3,):
-    range = xrange
 
 class Tailer(object):
     """\
     Implements tailing and heading functionality like GNU tail and head
     commands.
     """
-    line_terminators = ('\r\n', '\n', '\r')
+
+    line_terminators = ("\r\n", "\n", "\r")
 
     def __init__(self, file, read_size=1024, end=False):
         self.read_size = read_size
@@ -20,7 +19,7 @@ class Tailer(object):
             self.seek_end()
 
     def splitlines(self, data):
-        return re.split('|'.join(self.line_terminators), data)
+        return re.split("|".join(self.line_terminators), data)
 
     def seek_end(self):
         self.seek(0, 2)
@@ -91,7 +90,7 @@ class Tailer(object):
             # The last charachter is a line terminator, don't count this one
             bytes_read -= 1
 
-            if read_str[-2:] == '\r\n' and '\r\n' in self.line_terminators:
+            if read_str[-2:] == "\r\n" and "\r\n" in self.line_terminators:
                 # found crlf
                 bytes_read -= 1
 
@@ -173,7 +172,7 @@ class Tailer(object):
 
                 if line[-1] in self.line_terminators:
                     line = line[:-1]
-                    if line[-1:] == '\r\n' and '\r\n' in self.line_terminators:
+                    if line[-1:] == "\r\n" and "\r\n" in self.line_terminators:
                         # found crlf
                         line = line[:-1]
 
@@ -190,14 +189,12 @@ class Tailer(object):
     def close(self):
         self.file.close()
 
+
 def tail(file, lines=10):
     """\
     Return the last lines of the file.
 
-    >>> try:
-    ...    from StringIO import StringIO
-    ... except ImportError:
-    ...    from io import StringIO
+    >>> from io import StringIO
     >>> f = StringIO()
     >>> for i in range(11):
     ...     _ = f.write('Line %d\\n' % (i + 1))
@@ -206,14 +203,12 @@ def tail(file, lines=10):
     """
     return Tailer(file).tail(lines)
 
+
 def head(file, lines=10):
     """\
     Return the top lines of the file.
 
-    >>> try:
-    ...    from StringIO import StringIO
-    ... except ImportError:
-    ...    from io import StringIO
+    >>> from io import StringIO
     >>> f = StringIO()
     >>> for i in range(11):
     ...     _ = f.write('Line %d\\n' % (i + 1))
@@ -221,6 +216,7 @@ def head(file, lines=10):
     ['Line 1', 'Line 2', 'Line 3']
     """
     return Tailer(file).head(lines)
+
 
 def follow(file, delay=1.0):
     """\
@@ -244,19 +240,22 @@ def follow(file, delay=1.0):
     """
     return Tailer(file, end=True).follow(delay)
 
+
 def _test():
     import doctest
+
     doctest.testmod()
 
+
 def _main(filepath, options):
-    tailer = Tailer(open(filepath, 'rb'))
+    tailer = Tailer(open(filepath, "rb"))
 
     try:
         try:
             if options.lines > 0:
                 if options.head:
                     if options.follow:
-                        sys.stderr.write('Cannot follow from top of file.\n')
+                        sys.stderr.write("Cannot follow from top of file.\n")
                         sys.exit(1)
                     lines = tailer.head(options.lines)
                 else:
@@ -277,25 +276,57 @@ def _main(filepath, options):
     finally:
         tailer.close()
 
+
 def main():
     from optparse import OptionParser
     import sys
 
-    parser = OptionParser(usage='usage: %prog [options] filename')
-    parser.add_option('-f', '--follow', dest='follow', default=False, action='store_true',
-                      help='output appended data as  the  file  grows')
+    parser = OptionParser(usage="usage: %prog [options] filename")
+    parser.add_option(
+        "-f",
+        "--follow",
+        dest="follow",
+        default=False,
+        action="store_true",
+        help="output appended data as  the  file  grows",
+    )
 
-    parser.add_option('-n', '--lines', dest='lines', default=10, type='int',
-                      help='output the last N lines, instead of the last 10')
+    parser.add_option(
+        "-n",
+        "--lines",
+        dest="lines",
+        default=10,
+        type="int",
+        help="output the last N lines, instead of the last 10",
+    )
 
-    parser.add_option('-t', '--top', dest='head', default=False, action='store_true',
-                      help='output lines from the top instead of the bottom. Does not work with follow')
+    parser.add_option(
+        "-t",
+        "--top",
+        dest="head",
+        default=False,
+        action="store_true",
+        help="output lines from the top instead of the bottom. Does not work with follow",
+    )
 
-    parser.add_option('-s', '--sleep-interval', dest='sleep', default=1.0, metavar='S', type='float',
-                      help='with  -f,  sleep  for  approximately  S  seconds between iterations')
+    parser.add_option(
+        "-s",
+        "--sleep-interval",
+        dest="sleep",
+        default=1.0,
+        metavar="S",
+        type="float",
+        help="with  -f,  sleep  for  approximately  S  seconds between iterations",
+    )
 
-    parser.add_option('', '--test', dest='test', default=False, action='store_true',
-                      help='Run some basic tests')
+    parser.add_option(
+        "",
+        "--test",
+        dest="test",
+        default=False,
+        action="store_true",
+        help="Run some basic tests",
+    )
 
     (options, args) = parser.parse_args()
 
@@ -307,5 +338,6 @@ def main():
     else:
         _main(args[0], options)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
