@@ -16,19 +16,12 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Set up Poetry cache for Python dependencies
-      uses: actions/cache@v2
-      if: startsWith(runner.os, 'Linux')
-      with:
-        path: ~/.cache/pypoetry
-        key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}-${{ matrix.python-version }}
-        restore-keys: ${{ runner.os }}-poetry-${{ matrix.python-version }}
-    - name: Install Poetry
-      run: |
-        pip install poetry
+        cache: poetry
+    - name: Install poetry
+      run: pipx install poetry        
     - name: Install dependencies
       run: poetry install --no-interaction
     - name: Lint
