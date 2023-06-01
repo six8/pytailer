@@ -2,8 +2,8 @@
 Tailer
 ======
 
-.. image:: https://travis-ci.org/six8/pytailer.svg
-    :target: https://travis-ci.org/six8/pytailer
+.. image:: https://github.com/six8/pytailer/actions/workflows/python-package.yml/badge.svg
+    :target: https://github.com/six8/pytailer/actions/workflows/python-package.yml
     :alt: Build Status
 
 Python tail is a simple implementation of GNU tail and head.
