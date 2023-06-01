@@ -1,0 +1,74 @@
+[tool.poetry]
+name = "tailer"
+version = "0.4.1"
+description = "Python tail is a simple implementation of GNU tail and head."
+authors = ["Mike Thornton <six8@devdetails.com>", "Giridhar Vijaykumar <giridhar.v.20@gmail.com>"]
+license = "MIT"
+readme = "README.rst"
+homepage = "http://github.com/six8/pytailer"
+repository = "http://github.com/six8/pytailer"
+classifiers = [
+    "Programming Language :: Python",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Operating System :: POSIX",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    'Topic :: System :: Logging',
+    'Topic :: Text Processing',
+    "Topic :: System :: System Shells",
+    "Topic :: System :: Systems Administration",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+]
+include = ["LICENSE"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.3.1"
+pre-commit = "^3.3.2"
+black = "^23.3.0"
+autoflake = "^1.4"
+rst-include = "^2.1.2.2"
+poethepoet = "^0.20.0"
+bandit = "^1.7.5"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+
+[tool.pylint.format]
+max-line-length = "88"
+
+[tool.poetry.scripts]
+pytail = "tailer:main"
+
+[tool.pytest.ini_options]
+addopts = "--doctest-modules -v"
+
+[tool.poe.executor]
+type = "simple"
+
+[tool.poe.tasks]
+format = {shell = "autoflake --in-place --recursive --remove-all-unused-imports --ignore-init-module-imports . && black ."}
+lint.shell = """
+status=0
+echo '== black =='
+black --check . || status=1
+echo '== bandit =='
+bandit --exclude '*/tests/*' --recursive . || status=1
+exit $status
+"""
+# Generate readme
+readme = "rst_include include ./_README.rst ./README.rst"
+test = "pytest -vvv ./tailer"
