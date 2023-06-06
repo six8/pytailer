@@ -1,3 +1,4 @@
+import os
 import re
 import sys
 import time
@@ -160,7 +161,17 @@ class Tailer(object):
         """
         trailing = True
 
+        initial_inode = os.stat(self.file.name).st_ino
+        file_path = self.file.name
+
         while 1:
+            try:
+                if os.stat(self.file.name).st_ino != initial_inode:
+                    self.file = open(file_path)
+                    initial_inode = os.stat(self.file.name).st_ino
+            except FileNotFoundError:
+                continue
+
             where = self.file.tell()
             line = self.file.readline()
             if line:
@@ -234,9 +245,18 @@ def follow(file, delay=1.0):
     >>> f.flush()
     >>> next(generator)
     'Line 2'
+    >>> os.rename("test_follow.txt", "test_follow_1.txt")
+    >>> f = open('test_follow.txt', 'w')
+    >>> fo = open('test_follow.txt', 'r')
+    >>> generator = follow(fo)
+    >>> _ = f.write('Line 1\\n')
+    >>> f.flush()
+    >>> next(generator)
+    'Line 1'
     >>> f.close()
     >>> fo.close()
     >>> os.remove('test_follow.txt')
+    >>> os.remove('test_follow_1.txt')
     """
     return Tailer(file, end=True).follow(delay)
 
