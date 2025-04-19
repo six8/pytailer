@@ -159,9 +159,16 @@ class Tailer(object):
         Based on: http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/157035
         """
         trailing = True
+        current_pos = self.start_pos
 
         while 1:
             where = self.file.tell()
+            if where < current_pos:
+                # file trucated, restart
+                self.file.seek(0)
+
+            current_pos = where
+
             line = self.file.readline()
             if line:
                 if trailing and line in self.line_terminators:
@@ -180,7 +187,7 @@ class Tailer(object):
                 yield line
             else:
                 trailing = True
-                self.seek(where)
+                self.seek_end()
                 time.sleep(delay)
 
     def __iter__(self):
